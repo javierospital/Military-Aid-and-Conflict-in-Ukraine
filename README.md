@@ -29,8 +29,8 @@ We find a statistically significant correlation between cumulative military aid 
 Moreover, the correlation between military aid and fire activity may depend on transport infrastructure and the presence of natural resources. Below, we visualize Ukraine’s road network (World Bank, 2023) and the location of strategic mineral deposits (USGS, 2025). These maps help us understand how logistics and natural resources shape conflict intensity.
 
 <div align="center">
-  <img src="Key Figures/Ukraine-Figure-4.png" alt="Ukraine Roads" width="45%"/>
-  <img src="Key Figures/Ukraine-FIgure-5.png" alt="Minerals in Ukraine" width="45%"/>
+  <img src="Key Figures/Ukraine-Figure-4.png" alt="Ukraine Roads" width="50%"/>
+  <img src="Key Figures/Ukraine-FIgure-5.png" alt="Minerals in Ukraine" width="50%"/>
 </div>
 
 ## Contents

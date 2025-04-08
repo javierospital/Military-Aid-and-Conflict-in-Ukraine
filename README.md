@@ -40,25 +40,21 @@ This repository includes: An  analysis script in R Markdown (Ukraine_Geospatial.
 ## Data Sources
 
 This project draws on the following publicly available datasets:
-	•	Ukraine Support Tracker (Trebesch et al., 2023): Records international military aid allocations to Ukraine.
-Kiel Institute for the World Economy – Ukraine Support Tracker
-	•	War Fire Dataset (The Economist, 2022): Satellite data distinguishing war-related fires in Ukraine from natural fires.
-The Economist War Fire Model GitHub Repository
-	•	ISW Control Maps (Institute for the Study of War, 2025): Shapefiles tracking areas under Russian and Ukrainian control.
-Institute for the Study of War
-	•	World Bank Road Network (2023): GIS data on major road infrastructure in Ukraine.
-World Bank Open Data
-	•	USGS Mineral Resources (2024): Shapefiles of strategic mineral deposits across Ukraine.
-USGS Mineral Resources Data System
+
+	- Ukraine Support Tracker (Trebesch et al., 2023): Records international military aid allocations to Ukraine. Kiel Institute for the World Economy – Ukraine Support Tracker
+  	- War Fire Dataset (The Economist, 2022): Satellite data distinguishing war-related fires in Ukraine from natural fires. The Economist War Fire Model GitHub Repository
+   	- ISW Control Maps (Institute for the Study of War, 2025): Shapefiles tracking areas under Russian and Ukrainian control. Institute for the Study of War
+    	- World Bank Road Network (2023): GIS data on major road infrastructure in Ukraine. World Bank Open Data
+     	- USGS Mineral Resources (2024): Shapefiles of strategic mineral deposits across Ukraine. USGS Mineral Resources Data System
 
 ## References
-	•	Glanville, L., & Pattison, J. (2024). Ukraine and the opportunity costs of military aid. International Affairs, 100(4), 1571–1590. https://doi.org/10.1093/ia/iiae122
-	•	Trebesch, C., Antezza, A., Bushnell, K., Frank, A., Frank, P., Franz, L., Kharitonov, I., Kumar, B., Rebinskaya, E., & Schramm, S. (2023). The Ukraine Support Tracker. Kiel Working Paper No. 2218. Kiel Institute for the World Economy.
-	•	Tian, N., Lopes da Silva, D., Béraud-Sudreau, L., Liang, X., Scarazzato, L., & Assis, A. (2023). Developments in military expenditure and the effects of the war in Ukraine. Defence and Peace Economics, 34(5), 547–562. https://doi.org/10.1080/10242694.2023.2221877
-	•	The Economist. (2022). War Fire Dataset. https://github.com/TheEconomist/the-economist-war-fire-model
-	•	World Bank. (2023). Ukraine - Roads. https://datacatalog.worldbank.org
-	•	USGS. (2024). Mineral Resources Data System (MRDS). https://mrdata.usgs.gov/mrds
-	•	Harward, C. et al. (2025). Russian Offensive Campaign Assessment, March 2025. Institute for the Study of War.
+	Glanville, L., & Pattison, J. (2024). Ukraine and the opportunity costs of military aid. International Affairs, 100(4), 1571–1590. https://doi.org/10.1093/ia/iiae122
+	Trebesch, C., Antezza, A., Bushnell, K., Frank, A., Frank, P., Franz, L., Kharitonov, I., Kumar, B., Rebinskaya, E., & Schramm, S. (2023). The Ukraine Support Tracker. Kiel Working Paper No. 2218. Kiel Institute for the World Economy.
+	Tian, N., Lopes da Silva, D., Béraud-Sudreau, L., Liang, X., Scarazzato, L., & Assis, A. (2023). Developments in military expenditure and the effects of the war in Ukraine. Defence and Peace Economics, 34(5), 547–562. https://doi.org/10.1080/10242694.2023.2221877
+	The Economist. (2022). War Fire Dataset. https://github.com/TheEconomist/the-economist-war-fire-model
+	World Bank. (2023). Ukraine - Roads. https://datacatalog.worldbank.org
+	USGS. (2024). Mineral Resources Data System (MRDS). https://mrdata.usgs.gov/mrds
+	Harward, C. et al. (2025). Russian Offensive Campaign Assessment, March 2025. Institute for the Study of War.
 
 ## Authors
 

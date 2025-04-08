@@ -15,7 +15,7 @@ We combine geolocated fire data from The Economist’s War Fire Dataset and mili
 </p>
 
 
-## Military Aid and War-Fires
+### Military Aid and War-Fires
 
 We find a statistically significant correlation between cumulative military aid and war-related fire activity. Correlations are stronger in Ukrainian-controlled areas and in zones with good road access, suggesting a relevant role of transport networks in facilitating access to conflict areas. Surprisingly, war activity also increases near strategic mineral sites, possibly due to the location of Russian forces rather than deliberate avoidance by Ukraine. Below, we plot cumulative military aid and war-fire area by area of control.
 

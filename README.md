@@ -44,8 +44,8 @@ This project draws on the following publicly available datasets:
 	- Ukraine Support Tracker (Trebesch et al., 2023): Records international military aid allocations to Ukraine. Kiel Institute for the World Economy – Ukraine Support Tracker
   	- War Fire Dataset (The Economist, 2022): Satellite data distinguishing war-related fires in Ukraine from natural fires. The Economist War Fire Model GitHub Repository
    	- ISW Control Maps (Institute for the Study of War, 2025): Shapefiles tracking areas under Russian and Ukrainian control. Institute for the Study of War
-    	- World Bank Road Network (2023): GIS data on major road infrastructure in Ukraine. World Bank Open Data
-     	- USGS Mineral Resources (2024): Shapefiles of strategic mineral deposits across Ukraine. USGS Mineral Resources Data System
+	- World Bank Road Network (2023): GIS data on major road infrastructure in Ukraine. World Bank Open Data
+ 	- USGS Mineral Resources (2024): Shapefiles of strategic mineral deposits across Ukraine. USGS Mineral Resources Data System
 
 ## References
 	Glanville, L., & Pattison, J. (2024). Ukraine and the opportunity costs of military aid. International Affairs, 100(4), 1571–1590. https://doi.org/10.1093/ia/iiae122

@@ -30,9 +30,8 @@ Moreover, the correlation between military aid and fire activity may depend on t
 
 <div align="center">
   <img src="Key Figures/Ukraine-Figure-4.png" alt="Ukraine Roads" width="45%"/>
-  <img src="Key Figures /Ukraine-FIgure-5.png" alt="Minerals in Ukraine" width="45%"/>
+  <img src="Key Figures/Ukraine-FIgure-5.png" alt="Minerals in Ukraine" width="45%"/>
 </div>
-
 
 ## Contents
 

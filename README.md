@@ -4,7 +4,7 @@
 This project investigates whether international military aid to Ukraine can be used as a proxy for battlefield activity. Using satellite fire data and spatial models, we examine whether allocated military support correlates with fire activity. Indeed, we find that lagged cumulative military aid and war fire activity grow together over time:
 
  <p align="center">
-  <img src="Key Figures/Ukraine-Figure-1" width="700"/>
+  <img src="Key Figures/Ukraine-Figure-1" width="600"/>
 </p>
 
 ## Summary

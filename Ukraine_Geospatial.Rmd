@@ -1,0 +1,927 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+![](images/Generic%20Picture-01.jpg){width="300"}
+
+---
+title: "Final Project:<br>A Geospatial Analysis of Military Aid and Conflict Intensity in Ukraine"
+subtitle: "Geosp.atial Data Science and Economic Spatial Models"
+author: "Javier Ospital, Isabella Becerra, Camilo Giraldo, Álvaro Delgado"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Load necessary libraries, warning=FALSE, message=FALSE,results='hide'}
+#Set directory 
+setwd("C:/Users/Camilo Giraldo/Desktop/BSE - ITFD/2nd Term/Geospatial data science and economic spatial models/Final project")
+library(sf)
+library(readxl) 
+library(dplyr)
+library(readr)
+library(lubridate)
+library(leaflet)
+library(tidyverse)
+library(ggplot2)
+library(dodgr)
+library(geodist)
+library(dplyr)
+library(scales)
+
+```
+
+## 1. Motivation and context: a data-driven approach to military aid
+
+It is often hard to estimate the effect of international aid. It is particularly difficult regarding military aid, where data is rarely available. However, as the support from the US to Ukraine seems prone to wane or stop alltogether, it is paramount for European allies to evaluate the effect of support to Ukraine. In this project, we will explore whether we can use novel data sets to identify the relationship between the delivery of military aid and war outcomes.
+
+-   Relates to the literature on the effectiveness of international aid.
+-   Relates to the literature on Military aid and security
+-   Policy, current events relevance
+
+We are interested in capturing the relation between weapons delivered to Ukraine and the war's outcomes. However, public data on weapons delivered to Ukraine is not readily available. We will overcome these challenge of data availability by relying on two novel data sets to approximate delivered weapons . We rely on open-source data on official aid allocated to Ukraine by supporting countries, collected by the Ukraine Support Tracker (UST) by the Kiel Institute for the World Economy (IFW). And for the outcome of the war we will use satellite data on fires in Ukraine processed and made available by The Economist and Sondre Ulvund Solstad.
+
+We will conduct a series of tests designed to evaluate whether this data enables us to capture the relation between military aid and war outcomes. First, we will test the correlation between cumulative military aid and the size of war fires in Ukraine over the span of the conflict. We find a correlation that suggests we might indeed capture this relation. If this is indeed the case, we would expect the correlation to be stronger in the Russian-controlled areas of Ukraine since, presumably, those are the places that would be attacked using weapons given by international donors. Therefore, we test the correlation between military aid and war fires separately for Russian and Ukrainian-controlled areas in 2024. Moreover, weapons need to be transported within Ukraine to the front line where they are used. So, we expect the correlation between military aid and the size of war fires to be higher for better-connected regions.
+
+## 2. Literature review
+
+[**(3 paragraphs)**]{.underline}
+
+## 3. Data
+
+### 3.1 The Ukraine Support Tracker (UST): data structure and analytical use
+
+The Ukraine Support Tracker dataset (UST) collects open-source data on official, bilateral aid from international allies to Ukraine. They track allocations according to donors, and give granular information on the type of aid and equipment allocated when available. Military Aid includes weapons, ammunition, military equipment and funds for the procurement of weapons or ammunition. See *UST Dataset Documentation* and *UST Working Paper* for more.
+
+The UST dataset contains 3737 allocations or commitments of aid to Ukraine by 41 countries and three international institutions from January 2022 to January 2025. An ’allocation’ refers to an official act at the administrative level of government, such as a ministerial budget. A ’commitment’ instead is an act of high-level political support, such as a memorandum of understanding between Ukraine and the head of state of a donor country.
+
+Crucially, the UST does not report aid delivered to Ukraine. Instead, it is limited to reporting donor-side allocations, which rather represent a measure of political support. It is uncertain whether allocated aid is in fact delivered, in what form it is realized, and how long it can take for it to be used on the battlefront Therefore, we expect that using military aid as a proxy for delivered weapons to Ukraine is subject to significant measurement error. However, there may still be some relation between military aid and war outcomes. Since international military aid is allocated, after a certain lag, some of it would be realized as weapons that is then transported to the front-line and used to affect the outcomes of the war.
+
+Each entry in the UST data set corresponds to an ’allocation’ or ’commitment’ and reports its characteristics in great detail. These include the donor country, the announcement date, several estimates for its monetary value, and the type of aid, among others. These entries are placed into three broad types: humanitarian, financial, and military, according to their intended purpose. As a proxy for delivered weapons, we will use the cumulative value of allocations of military aid. We use the the value of aid in euros (EUR) because the number and type of weapons is not often reported by donors. Moreover, we take the cumulative value because weapons can be used over a long period, so weapons delivered at the beginning of the conflict have become a part of Ukraine's stock and are likely still being used actively.
+
+Finally, we will use 7 months as a general estimate for aid to be realized as weapons and equipment on the ground. Determining the time it takes for military aid to reach and impact operations in Ukraine is complex, as it varies based on the type of equipment, the donor country, and logistical considerations. Journalistic sources claim delivery times can range from two months to a year, depending on the specific circumstances surrounding each aid package. Given these variations, we use 7 months as a midpoint estimate, aiming to capture the reported periods taken to procure and deliver weapons to Ukraine.
+
+```         
+1.  UST Dataset (UST_Release_21.xlsx). Available at: https://www.ifw-kiel.de/topics/war-against-ukraine/ukraine-support-tracker/. 
+2. The Time. American red tape is standing in the way of victory. Availanle at: https://www.thetimes.com/world/russia-ukraine-war/article/american-red-tape-standing-way-victory-weapons-ukraine-l2tjd2kg9?region=global 
+```
+
+```{r Load UST data, warning=FALSE, message=FALSE }
+# Load data from the third sheet
+sheet_name <- "Bilateral Assistance, MAIN DATA"
+UST_data <- read_excel("Data/UST_Release_21.xlsx", sheet = sheet_name, col_types = "guess")  # Ensure correct type inference
+```
+
+```{r Convert date format, warning=FALSE}
+
+#  We convert the date format, from Excel to Date.
+UST_data <- UST_data %>%
+  mutate(announcement_date = as.numeric(announcement_date)) %>%
+  mutate(announcement_date = as.Date(announcement_date, origin = "1899-12-30"))
+```
+
+### 3.2 Load fires data
+
+This War Fires Databases uses satellite-images of fires in Ukraine, using a probabilistic model to identify them as being war-related or not. It identifies fire incidents likely caused by military activity in Ukraine using a probabilistic model that compares observed fire patterns to historical baselines. By filtering out natural wildfires and leveraging spatial, temporal, and contextual data (e.g., population density and proximity to conflict zones), the model assigns probabilities to classify fires as war-related.
+
+The length of war fire area measures the extent of detected fires over time. It accounts for the area affected by sustained fires, distinguishing between temporary fires and persistent burning that is more likely to be war-related. This measure helps filter out short-lived fires and focuses on those that indicate ongoing military activity, such as artillery shelling, or airstrikes.
+
+Therefore, this data base provides proxy for war outcomes by tracking the spread, and frequency of conflict-driven destruction. Unlike traditional battlefield reports, which may be delayed, biased, or incomplete, this dataset offers real-time, physical manifestation of military engagements, making it a more objective and continuous measure of conflict dynamics.
+
+```         
+2.  War Fires Dataset (ukraine_war_fires.csv).Available at: https://github.com/TheEconomist/the-economist-war-fire-model/tree/master/source-data 
+```
+
+```{r load-ukraine_fires, warning=FALSE, message=FALSE}
+
+# Define file path (adjusted for "Data" subfolder)
+file_path <- "Data/ukraine_war_fires.csv"
+
+# Load data
+ukraine_fires <- read_csv(file_path)
+```
+
+```{r Visualize fires on Ukriane 2, warning=FALSE, fig.width=13, fig.height=8, dpi=600}
+sf_fires <- st_as_sf(ukraine_fires, coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
+
+ggplot(sf_fires) +
+  geom_sf(aes(size = length_of_war_fire_area), alpha = 0.9, color = "red3") +
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(size = 14, hjust = 0.5)
+  ) +
+  labs(
+    title = "Annual War Fires in Ukraine",
+    subtitle = "Dot size reflects fire intensity"
+  ) +
+  scale_size_continuous(range = c(0.000001, 0.05))
+```
+
+## 4. Correlation between cumulative military aid & war fires
+
+We begin by exploring whether there is some relation between cumulative military aid and fires identified as being related to the war, we must aggregate both data sets on the date variable and obtain a time series of aid and war fires. Critically, we will lag aid by seven months, as a rough estimate of how long it can take from the announcement of aid allocations to them being actually used on the battleground.
+
+### 4.1.Aggregate military aid announcements
+
+```{r UST data cleaning 1, warning=FALSE }
+
+#We filter for measure=Allocation
+UST_allocations <- UST_data %>%
+  filter(measure == "Allocation")
+
+UST_allocations <- UST_allocations %>%
+  mutate(
+    item_type = ifelse(is.na(item_type) | item_type == ".", aid_type_specific, item_type),
+    item_sub_type = ifelse(is.na(item_sub_type) | item_sub_type == ".", aid_type_specific, item_sub_type)
+  )
+
+```
+
+```{r Dealing with NAs, warning=FALSE }
+
+# Convert item_numb to numeric, replacing "." and "undisclosed" with 0
+UST_allocations <- UST_allocations %>%
+  mutate(item_numb = ifelse(item_numb %in% c(".", "undisclosed"), "0", item_numb))
+
+# Convert to integer type (whole numbers)
+UST_allocations <- UST_allocations %>%
+  mutate(item_numb = as.integer(item_numb))
+
+# Replace "." with NA in item_value_estimate_USD
+UST_allocations <- UST_allocations %>%
+  mutate(item_value_estimate_USD = ifelse(item_value_estimate_USD == ".", NA, item_value_estimate_USD))
+
+```
+
+Aid over time by aid_type_general
+
+```{r Aggregate UST on announcment date and aid_type_general, warning=FALSE, message= FALSE}
+
+# Aggregate data by announcement_date and item_type
+UST_aid_type_general <- UST_allocations %>%
+  group_by(announcement_date, aid_type_general) %>%
+  summarise(
+    total_item_numb = sum(item_numb, na.rm = TRUE),  # Sum total items
+    total_value_EUR = sum(tot_sub_activity_value_EUR_redistr, na.rm = TRUE)  # Sum total value
+  ) %>%
+  ungroup()
+```
+
+### 4.2 Aggregate war fires data
+
+```{r Aggregagate War Fires Data on date, warning=FALSE }
+
+# Aggregate war_fire and length_of_war_fire_area on date
+war_fires_aggregated <- ukraine_fires %>%
+  group_by(date) %>%
+  summarise(
+    total_war_fires = sum(war_fire, na.rm = TRUE),  # Sum war fires per day
+    total_war_fire_area = sum(length_of_war_fire_area, na.rm = TRUE),  # Sum war fire area per day
+    .groups = "drop"
+  )
+
+glimpse(war_fires_aggregated)
+```
+
+### 4.3 Exploring correlation
+
+Below, we visualize a possible relation between cumulative military aid and the total size of war-related fires in Ukraine. This plot suggests that there can be some relation between the two.
+
+```{r, create aid war fires_merged}
+
+# Ensure date columns are in Date format
+UST_aid_type_general <- UST_aid_type_general %>%
+  mutate(announcement_date = as.Date(announcement_date))
+
+war_fires_aggregated <- war_fires_aggregated %>%
+  mutate(date = as.Date(date))
+
+# Ensure realistic dates (remove erroneous years)
+UST_aid_type_general <- UST_aid_type_general %>%
+  filter(announcement_date > as.Date("2015-01-01"))
+
+# Apply fixed lag of 210 days
+war_fires_lagged <- war_fires_aggregated %>%
+  mutate(announcement_date = date + 210) %>%
+  dplyr::select(announcement_date, total_war_fires, total_war_fire_area)
+
+# Merge Aid Data with Lagged War Fires
+aid_war_fires_merged <- UST_aid_type_general %>%
+  left_join(war_fires_lagged, by = "announcement_date") %>%
+  filter(!is.na(total_war_fires) & !is.na(total_value_EUR))  # Remove missing values
+
+```
+
+```{r Make_time_series_plot_2, fig.width=12, fig.height=8, dpi=600}
+
+# Compute cumulative sum for both variables
+aid_war_fires_cumulative <- aid_war_fires_merged %>%
+  arrange(announcement_date) %>%
+  mutate(
+    cumulative_military_aid = cumsum(total_value_EUR),
+    cumulative_war_fire_area = cumsum(total_war_fire_area) / max(cumsum(total_war_fire_area)) * max(cumsum(total_value_EUR))
+  )
+
+# Plot cumulative trends over time
+ggplot(aid_war_fires_cumulative, aes(x = announcement_date)) +
+  geom_line(aes(y = cumulative_military_aid, color = "Cumulative Military Aid (EUR)"), size = 1.2) +
+  geom_line(aes(y = cumulative_war_fire_area, color = "War Fire Area (Scaled)"), size = 1.2) +
+  scale_y_continuous(
+    name = "Cumulative Military Aid (EUR)",
+    labels = label_number(scale = 1e-9, suffix = "B"),
+    sec.axis = sec_axis(
+      transform = ~.,
+      name = "War Fire Area (Scaled)"
+    )
+  ) +
+  labs(
+    title = "Cumulative Military Aid and War Fire Area",
+    x = "Date",
+    y = "Cumulative Military Aid (EUR) (210-Day Lag)"
+  ) +
+  scale_color_manual(
+    values = c("Cumulative Military Aid (EUR)" = "blue3", "War Fire Area (Scaled)" = "red3")
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    plot.title = element_text(size = 18, hjust = 0.5, face = "bold")
+  )
+
+```
+
+Now, we compute the linear correlation between cumulative military aid and total war fire area. We find a statistical significant correlation of 0.293, within a 95 percent confidence interval bound by 0.212 and 0.368.
+
+```{r, correlation cumulative military aid}
+
+# Ensure data is sorted correctly
+aid_war_fires_cumulative <- aid_war_fires_merged %>%
+  arrange(announcement_date) %>%
+  mutate(
+    cumulative_military_aid = cumsum(total_value_EUR),  # Only Aid is cumulative
+    total_war_fire_area = total_war_fire_area  # Keep fire area as is
+  )
+
+# Compute correlation
+correlation_result <- cor.test(
+  aid_war_fires_cumulative$cumulative_military_aid,
+  aid_war_fires_cumulative$total_war_fire_area,
+  method = "pearson"
+)
+
+# Print correlation results
+print(correlation_result)
+
+# Extract key values
+correlation_value <- correlation_result$estimate
+p_value <- correlation_result$p.value
+
+# Print formatted output
+cat("\n Correlation between Cumulative Military Aid and Total War Fire Area:\n")
+cat("Pearson Correlation: ", round(correlation_value, 4), "\n")
+cat("p-value: ", format.pval(p_value, digits = 4), "\n")
+
+# Save results
+cor_results_df <- data.frame(
+  correlation = correlation_value,
+  p_value = p_value
+)
+
+```
+
+## 5. Spatial Correlations (From East-to-West)
+
+Do we see a relation between military aid and fire incidence at the level of Ukrainian regions? We would expect to see some correlation between cumulative military aid and war_related fires in regions where there is ongoing fighting (Eastern regions). And there should be no relationship in regions where there has never been any fighting (Western regions) or between cumulative military aid and non_war related fires. Crucially, any fires to the West, further away from the front line, probably correspond to Russian attacks, while fires to the West are probably caused by Ukrainian attacks on Russian-controlled territory.
+
+```         
+•   Define Spatial Units with sf, spatially join fires and military aid to Ukrainian regions ( as in Lecture 6).
+•   Aggregate Data by Region. Compute the total war-related and non-war fires per region using dplyr (Lecture 4). Non-war fires are in a some of the ukraine_fires dataset, we could also do it only with war_related_fires. 
+•   Compare Eastern vs. Western Regions .Use filter() to split the dataset and compare aid vs. fires in both areas (Lecture 7).
+•   Compute Correlations .Analyze relationships between cumulative military aid and war-related fires using cor.test() (as in Lecture 8).
+•   Visualize Patterns → Use ggplot2 to create scatter plots and maps to illustrate regional trends (Lecture 7).
+```
+
+### 5.1 Spatial Correlations (Russian and Ukrainian-Controlled Regions)
+
+We overlay data on who controlled which area at each time and select the fires occurring only in Russian-controlled areas. The correlation between these and military aid to Ukraine should be higher since it better captures Ukraine's offensive capacity than overall fires. First, we incorporate spatial data on areas under Russian control from the Institute for the Study of War (ISW).
+
+```{r, load-russian-control data}
+# Load required libraries
+
+# Define file paths
+russian_control_path <- "Data/ISW_historical/ClaimedRussian_shapes.RDS"
+
+# Load the spatial RDS data
+russian_control <- readRDS(russian_control_path)
+
+# Convert data_name to Date format 
+russian_control$data_name <- as.Date(russian_control$data_name, format="%Y-%m-%d")
+
+# Create a new column for the year
+russian_control$year <- format(russian_control$data_name, "%Y")
+russian_control <- st_transform(russian_control, crs = 4326)
+
+```
+
+Now, we join the Russian controlled areas in 2024 with war fires in 2024 by location and date to identify war fires occurring in Russian-controlled areas and fires in Ukrainian-controlled areas. For that, we must filter the both data sets for their values in 2024, join them and identify fires that occurred in a Russian-controlled area and those occurring in a Ukrainian-controlled area.
+
+```{r, filter-for 2024}
+# Remove empty geometries from Russian-controlled areas
+russian_control_2024 <- russian_control %>%
+  filter(year == "2024") %>%
+  filter(!st_is_empty(geometry)) %>%
+  select(year, geometry, data_name)
+
+# Select relevant columns for war fires and retain "date"
+war_fires_2024 <- sf_fires %>%
+  filter(year == 2024) %>%
+  select(year, geometry, date, length_of_war_fire_area)  # Retaining date for correlation analysis
+
+```
+
+```{r, spatial-join}
+
+# Perform the Spatial Join to add Russian-controlled areas to each fire point, without cutting geometries:
+fires_by_area <- st_join(war_fires_2024, russian_control_2024, left = TRUE)
+
+# Now, we create an in_russian_controlled Columnn with value 1 if a fire has matched a Russian-controlled area, and 0 otherwise since it’s in Ukrainian-controlled territory. 
+fires_by_area <- fires_by_area %>%
+  mutate(in_russian_controlled = ifelse(!is.na(data_name), 1, 0))
+
+```
+
+```{r load_Ukraine_district_map, fig.width=13, fig.height=8, dpi=600}
+
+# Load Ukraine shapefile (adjust path as needed)
+ukraine_map <- st_read("Data/gadm41_UKR_shp/gadm41_UKR_2.shp")
+
+ukraine_map <- st_transform(ukraine_map, crs = 4326)
+
+# Plot the map
+ggplot() +
+  # Base Ukraine map
+  geom_sf(data = ukraine_map, fill = "gray90", color = "black") +
+  
+  # Russian-controlled areas
+  geom_sf(data = russian_control_2024, fill = "gray25", color = "gray25", alpha = 0.5) +
+  
+  # War fires in Russian-controlled areas (blue)
+  geom_sf(data = fires_by_area %>% filter(in_russian_controlled == 1), 
+          aes(size = length_of_war_fire_area), 
+          alpha = 0.4,
+          color = "blue3") +
+  
+  # War fires in Ukrainian-controlled areas (red)
+  geom_sf(data = fires_by_area %>% filter(in_russian_controlled == 0), 
+          aes(size = length_of_war_fire_area), 
+          alpha = 0.4,
+          color = "red3") +
+  
+  # Labels & formatting
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(size = 14, hjust = 0.5)
+  ) +
+  labs(
+    title = "War Fires by Control in Ukraine (2024)",
+    subtitle = "Blue = Russian-Controlled | Red = Ukrainian-Controlled | Dot size = fire area",
+    caption = "Source: ISW & Economist Fire Data"
+  ) +
+  scale_size_continuous(range = c(0.000001, 0.05))
+```
+
+Now, we conduct a Spatial Correlation Analysis
+
+Step 1: Aggregate War Fires by Date & Control Status
+
+```{r, Aggregate War Fires by Date & Control Status}
+
+# Aggregate war fire lengths separately for Russian & Ukrainian controlled areas
+fires_aggregated <- fires_by_area %>%
+  group_by(date, in_russian_controlled) %>%
+  summarise(total_war_fire_area = sum(length_of_war_fire_area, na.rm = TRUE), .groups = "drop")
+
+# Rename for clarity
+fires_aggregated <- fires_aggregated %>%
+  mutate(control_status = ifelse(in_russian_controlled == 1, "Russian-Controlled", "Ukrainian-Controlled"))
+
+```
+
+Step 2: Merge with Cumulative International Military Aid
+
+```{r, Merge with International Military Aid, message=FALSE, warning=FALSE}
+
+# Apply fixed lag of 210 days
+fires_aggregated_lagged <- fires_aggregated %>%
+  mutate(announcement_date = date + 210)
+
+# Merge Aid Data with Lagged War Fires
+aid_war_fires_merged <- UST_aid_type_general %>%
+  left_join(fires_aggregated_lagged, by = "announcement_date") %>%
+  filter(!is.na(total_war_fire_area) & !is.na(total_value_EUR))  # Remove missing values
+```
+
+Plot Trends for Russian-Controlled and Ukrainian Controlled Areas
+
+```{r, visualize relationship-over time}
+# Compute cumulative values for Russian-controlled areas
+aid_war_fires_russian <- aid_war_fires_merged %>%
+  filter(in_russian_controlled == 1) %>%
+  arrange(announcement_date) %>%
+  mutate(
+    cumulative_military_aid = cumsum(total_value_EUR),
+    cumulative_war_fire_area = cumsum(total_war_fire_area)
+  )
+
+# Compute cumulative values for Ukrainian-controlled areas
+aid_war_fires_ukrainian <- aid_war_fires_merged %>%
+  filter(in_russian_controlled == 0) %>%
+  arrange(announcement_date) %>%
+  mutate(
+    cumulative_military_aid = cumsum(total_value_EUR),
+    cumulative_war_fire_area = cumsum(total_war_fire_area) / max(cumsum(total_war_fire_area)) * max(cumsum(total_value_EUR))
+  )
+```
+
+```{r trends_by_area, fig.width=12, fig.height=8, dpi=600}
+
+# Combine data for facetting
+aid_war_fires_combined <- bind_rows(
+  aid_war_fires_russian %>% mutate(region = "Russian-Controlled"),
+  aid_war_fires_ukrainian %>% mutate(region = "Ukrainian-Controlled")
+)
+
+# Normalize both variables within each region
+aid_war_fires_combined <- aid_war_fires_combined %>%
+  group_by(region) %>%
+  mutate(
+    scaled_military_aid = (cumulative_military_aid - min(cumulative_military_aid)) /
+                          (max(cumulative_military_aid) - min(cumulative_military_aid)),
+    scaled_war_fire_area = (cumulative_war_fire_area - min(cumulative_war_fire_area)) /
+                           (max(cumulative_war_fire_area) - min(cumulative_war_fire_area))
+  ) %>%
+  ungroup()
+
+# Plot with facets
+ggplot(aid_war_fires_combined, aes(x = announcement_date)) +
+  geom_line(aes(y = scaled_military_aid, color = "Cumulative Military Aid"), size = 1.2) +
+  geom_line(aes(y = scaled_war_fire_area, color = "War Fire Area"), size = 1.2) +
+  scale_y_continuous(name = "Normalized Values (0 to 1)") +
+  facet_wrap(~ region) +
+  labs(
+    title = "Military Aid and War Fires Over Time by Region",
+    subtitle = "Comparison of trends in Russian- and Ukrainian-controlled areas",
+    x = NULL,  # remove "Date" from x-axis
+    y = NULL
+  ) +
+  scale_color_manual(
+    values = c("Cumulative Military Aid" = "blue3", "War Fire Area" = "red3")
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(size = 13, hjust = 0.5, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),
+    panel.spacing = unit(2, "lines")  # increases space between facet panels
+  )
+```
+
+```{r, correlation-by-control-area}
+
+# Compute cumulative military aid (same for both)
+aid_war_fires_cumulative <- aid_war_fires_merged %>%
+  arrange(announcement_date) %>%
+  mutate(cumulative_military_aid = cumsum(total_value_EUR))
+
+# Filter fires by Russian-controlled areas
+aid_war_fires_russian <- aid_war_fires_cumulative %>%
+  filter(in_russian_controlled == 1)
+
+# Filter fires by Ukrainian-controlled areas
+aid_war_fires_ukrainian <- aid_war_fires_cumulative %>%
+  filter(in_russian_controlled == 0)
+
+# Pearson Correlation for Russian-Controlled Areas
+cor_russian <- cor.test(
+  aid_war_fires_russian$cumulative_military_aid,
+  aid_war_fires_russian$total_war_fire_area,
+  method = "pearson"
+)
+
+# Pearson Correlation for Ukrainian-Controlled Areas
+cor_ukrainian <- cor.test(
+  aid_war_fires_ukrainian$cumulative_military_aid,
+  aid_war_fires_ukrainian$total_war_fire_area,
+  method = "pearson"
+)
+
+# Print Results
+cat("Correlation in Russian-Controlled Areas:\n")
+print(cor_russian)
+
+cat("Correlation in Ukrainian-Controlled Areas:\n")
+print(cor_ukrainian)
+```
+
+Scatter plots of cumulative military aid and the size of war fires by area of control.
+
+```{r scatter_plots_by_region, fig.width=12, fig.height=8}
+
+# Scatter Plot for Russian-Controlled Areas
+ggplot(aid_war_fires_russian, aes(x = cumulative_military_aid, y = total_war_fire_area)) +
+  geom_point(color = "blue3", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue3", linetype = "dashed") +
+  annotate("text", x = min(aid_war_fires_russian$cumulative_military_aid), 
+           y = max(aid_war_fires_russian$total_war_fire_area), 
+           label = paste0("r = ", round(cor(aid_war_fires_russian$cumulative_military_aid, 
+                                             aid_war_fires_russian$total_war_fire_area), 3)), 
+           color = "blue3", hjust = 0, size = 5) +
+  labs(
+    title = "Correlation Between Military Aid and War Fires (Russian-Controlled Areas)",
+    x = "Cumulative Military Aid (EUR)",
+    y = "Total War Fire Area",
+    caption = "Source: ISW & Aid Data"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+  )
+
+# Scatter Plot for Ukrainian-Controlled Areas
+ggplot(aid_war_fires_ukrainian, aes(x = cumulative_military_aid, y = total_war_fire_area)) +
+  geom_point(color = "red3", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red3", linetype = "dashed") +
+  annotate("text", x = min(aid_war_fires_ukrainian$cumulative_military_aid), 
+           y = max(aid_war_fires_ukrainian$total_war_fire_area), 
+           label = paste0("r = ", round(cor(aid_war_fires_ukrainian$cumulative_military_aid, 
+                                             aid_war_fires_ukrainian$total_war_fire_area), 3)), 
+           color = "red3", hjust = 0, size = 5) +
+  labs(
+    title = "Correlation Between Military Aid and War Fires (Ukrainian-Controlled Areas)",
+    x = "Cumulative Military Aid (EUR)",
+    y = "Total War Fire Area",
+    caption = "Source: ISW & Aid Data"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+  )
+```
+
+### 5.2 Overlaying Road Networks
+
+```         
+THIS SHOULD BE DROP
+•   Load and Process Road Network Data, with sf read in road shapefiles and st_as_sf() to convert them (Lecture 6).
+•   Compute Distance to Nearest Road. Use st_distance() to measure the distance between fire locations and the closest road (Lecture 7).
+•   Calculate Road Density per Region. Aggregate total road length within each region using st_length() (Lecture 4).
+•   Compute Road Distance from Kyiv: Use network analysis with sfnetwork or dodgr to find road-based distances (Homework 2).
+•   Analyze Correlation with Military Aid: Compare cumulative military aid, road connectivity, and war fire incidence using cor.test() (Lecture 8).
+```
+
+Is the correlation between cumulative military aid and war-related fires stronger in better-connected regions?
+
+This section explores whether the incidence of fires in a region is related to its level of road connectivity. Specifically, we ask:
+
+-   Does fire incidence increase with the distance to the nearest road?
+-   Do Better-Connected Regions See a Stronger Aid-Fire Correlation?
+
+We hypothesize that regions better connected by road infrastructure may exhibit a stronger correlation between cumulative military aid and fire incidence, since military equipment and supplies must be transported to the front lines.
+
+We load and visualizes road infrastructure data in Ukraine, sourced from the World Bank. We decided to include only primary roads, which are the major transportation routes most relevant for large-scale military logistics. The map shows the spatial distribution of primary roads across Ukraine along with the location of Kyiv, which serves as a central reference point for subsequent road distance calculations and connectivity analysis.
+
+```{r Ukraine_roads, fig.width=13, fig.height=8, dpi=600}
+
+ukraine_roads <- st_read("Data/hotosm_ukr_roads_lines_shp/hotosm_ukr_roads_lines.shp")
+ukraine_roads <- st_transform(ukraine_roads, crs = 4326)
+
+roads_primary <- ukraine_roads %>%
+  filter(highway %in% c("primary"))
+
+# Define Kyiv coordinates (city center)
+kyiv_sf <- st_as_sf(data.frame(
+  name = "Kyiv",
+  lon = 30.5234,
+  lat = 50.4501
+), coords = c("lon", "lat"), crs = st_crs(ukraine_map))
+
+# Plot roads and Kyiv
+ggplot() +
+  geom_sf(data = ukraine_map, fill = "grey90", color = "black") +
+  geom_sf(data = roads_primary, color = "darkred", size = 0.5) +
+  geom_sf(data = kyiv_sf, aes(shape = name), color = "blue", size = 4) +
+  scale_shape_manual(name = NULL, values = c("Kyiv" = 16)) +
+  labs(
+    title = "Major Road Network and Location of Kyiv",
+    caption = "Source: World Bank Road Data & GADM Ukraine"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+    legend.position = "bottom"
+  )
+```
+
+Next, we calculate the Euclidean distance from each recorded fire location to the nearest primary road using spatial distance matrices. This measure serves as a proxy for local infrastructural accessibility.
+
+```{r, distance of fires to roads}
+dist_matrix <- st_distance(fires_aggregated_lagged, roads_primary)
+# Add minimum distance to fire data
+fires_aggregated_lagged$min_dist_to_road_km <- apply(dist_matrix, 1, min) / 1000  # in km
+```
+
+#### Fire Incidence by Proximity to Roads
+
+To better understand the distribution of fires by road proximity, we group fire locations into distance categories (bins). The plot below shows the number of fire incidents by distance to the nearest road.
+
+```{r aid_and_distance_to_fire, fig.width=10, fig.height=6}
+
+# Create distance bins and aggregate
+fires_aggregated_lagged <- fires_aggregated_lagged %>%
+  mutate(distance_bin = cut(min_dist_to_road_km, 
+                            breaks = c(0, 1, 5, 10, 15, 20, 50, Inf), 
+                            labels = c("<1km", "1–5km", "5–10km", "10–15km", "15–20km", "20–50km", ">50km"),
+                            include.lowest = TRUE))
+
+fire_incidence_by_distance <- fires_aggregated_lagged %>%
+  group_by(distance_bin) %>%
+  summarize(fire_count = n()) %>%
+  ungroup()
+
+# Plot
+ggplot(fire_incidence_by_distance, aes(x = distance_bin, y = fire_count)) +
+  geom_bar(stat = "identity", fill = "firebrick", alpha = 0.8, width = 0.7) +
+  geom_text(aes(label = fire_count), vjust = -0.5, size = 4, fontface = "bold") +  # Add labels
+  labs(
+    title = "Distribution of War Fires by Distance to Primary Roads",
+    subtitle = "Most fire incidents occur within 5km of road infrastructure",
+    x = "Distance to Nearest Road (km)",
+    y = "Number of War Fire Events"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 0, vjust = 0.5, size = 11),
+    panel.grid.minor = element_blank()
+  )
+```
+
+As illustrated in the plot, a substantial proportion of fire incidents occur within 1 kilometer of a primary road, suggesting that road infrastructure may be a frequent target during the conflict. This pattern could reflect deliberate strategies aimed at disrupting transportation and logistical networks.
+
+#### Fire-Aid Correlation
+
+In regions with better access to road infrastructure, military aid may more directly support logistics and operational capabilities, potentially intensifying conflict activity, and thus, increasing the incidence of fires. To explore this, we first merge the fire dataset—containing the distance from each fire to the nearest road—with military aid data based on the date of aid announcement. We then calculate, for each day and region under territorial control (Ukrainian or Russian), the average distance of fires to the nearest road, as a proxy for infrastructure accessibility, the daily total value of military aid received and the cumulative value of aid over time, to reflect how the buildup of resources may affect conflict dynamics.
+
+```{r, aid and distance to fire, fig.width=12, fig.height=8, dpi=600}
+# Plot: Russian-Controlled
+ggplot(dist_russian, aes(x = avg_distance_km, y = cumulative_aid)) +
+  geom_point(color = "blue3", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue3", linetype = "dashed") +
+  annotate("text",
+           x = min(dist_russian$avg_distance_km, na.rm = TRUE),
+           y = max(dist_russian$cumulative_aid, na.rm = TRUE),
+           label = paste0("r = ", round(cor(dist_russian$avg_distance_km, dist_russian$cumulative_aid, use = "complete.obs"), 3)),
+           color = "blue3", hjust = 0, size = 5) +
+  labs(
+    title = "Avg. Distance to Roads vs. Cumulative Military Aid\n(Russian-Controlled Areas)",
+    x = "Average Distance to Nearest Road (km)",
+    y = "Cumulative Military Aid (EUR)",
+    caption = "Source: ISW & Aid Data"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+  )
+
+# Plot: Ukrainian-Controlled
+ggplot(dist_ukrainian, aes(x = avg_distance_km, y = cumulative_aid)) +
+  geom_point(color = "red3", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red3", linetype = "dashed") +
+  annotate("text",
+           x = min(dist_ukrainian$avg_distance_km, na.rm = TRUE),
+           y = max(dist_ukrainian$cumulative_aid, na.rm = TRUE),
+           label = paste0("r = ", round(cor(dist_ukrainian$avg_distance_km, dist_ukrainian$cumulative_aid, use = "complete.obs"), 3)),
+           color = "red3", hjust = 0, size = 5) +
+  labs(
+    title = "Avg. Distance to Roads vs. Cumulative Military Aid\n(Ukrainian-Controlled Areas)",
+    x = "Average Distance to Nearest Road (km)",
+    y = "Cumulative Military Aid (EUR)",
+    caption = "Source: ISW & Aid Data"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+  )
+```
+
+A stronger negative correlation (higher aid associated with closer proximity to roads) indicate that aid flows are indeed concentrated in logistically accessible areas where conflict activity is higher.
+
+## 6. Relation between Military aid and natural resources
+
+In this section, we visualize the spatial distribution of strategic mineral deposits across Ukraine using geospatial data from the USGS Mineral Resources Data System (MRDS). We begin by filtering the mineral sites to include only those within Ukraine’s administrative boundaries. Each deposit is categorized into key mineral groups (e.g., lithium, uranium, rare earths) based on standardized codes.
+
+```{r mineral_map_plot, fig.width=12, fig.height=8, dpi=600}
+
+# Load Ukraine map
+ukraine_map <- st_read("Data/gadm41_UKR_shp/gadm41_UKR_2.shp") %>%
+  st_transform(crs = 4326)
+
+# Load MRDS mineral deposit shapefile and transform to match CRS
+mrds <- st_read("Minerals/mrds-trim.shp") %>%
+  st_transform(crs = st_crs(ukraine_map))
+
+# Filter deposits located in Ukraine
+mrds_ukraine <- st_filter(mrds, ukraine_map)
+
+# Categorize mineral types
+mrds_ukraine <- mrds_ukraine %>%
+  mutate(mineral_group = case_when(
+    grepl("LI", CODE_LIST, ignore.case = TRUE) ~ "Lithium",
+    grepl("U", CODE_LIST, ignore.case = TRUE) ~ "Uranium",
+    grepl("TI", CODE_LIST, ignore.case = TRUE) ~ "Titanium",
+    grepl("ZR", CODE_LIST, ignore.case = TRUE) ~ "Zirconium",
+    grepl("RE|RARE", CODE_LIST, ignore.case = TRUE) ~ "Rare Earths",
+    grepl("MG|FE|MN", CODE_LIST, ignore.case = TRUE) ~ "Iron / Manganese",
+    grepl("GRF|GRAPH", CODE_LIST, ignore.case = TRUE) ~ "Graphite",
+    TRUE ~ "Other"
+  ))
+
+# Buffer zone
+mrds_buffer <- st_transform(mrds_ukraine, crs = 3857) %>%
+  st_buffer(dist = 80000) %>%
+  st_transform(crs = 4326)
+mrds_buffer$mineral_group <- mrds_ukraine$mineral_group
+
+# Plot with Russian-controlled areas overlay
+ggplot() +
+  geom_sf(data = ukraine_map, fill = "gray95", color = "gray70", size = 0.3) +
+  geom_sf(data = russian_control_2024, fill = "gray25", color = "gray25", alpha = 0.4) +
+  geom_sf(data = mrds_buffer, aes(fill = mineral_group), alpha = 0.15, color = NA) +
+  geom_sf(data = mrds_ukraine, aes(color = mineral_group), size = 2, alpha = 0.8) +
+  scale_color_brewer(palette = "Set1", guide = guide_legend(title = NULL)) +
+  scale_fill_brewer(palette = "Set1", guide = "none") +
+  labs(
+    title = "Mineral Deposits in Ukraine",
+    subtitle = "Including Russian-controlled zones (shaded)",
+    caption = "Source: USGS Mineral Resources Data System (2025)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    plot.caption = element_text(size = 8, hjust = 1)
+  )
+```
+
+```         
+```
+
+### 6.1 Are war-related fires more likely to occur in areas rich in critical minerals?
+
+To explore whether war-related fires are more likely to occur near strategic mineral deposits, we created 50-kilometer buffer zones around all mineral sites in Ukraine. These zones serve as spatial proxies for areas with potential strategic resource value.
+
+Using spatial intersection, each fire event was flagged as either occurring near a mineral zone or not. We then conducted a two-sample t-test to statistically compare the average size of war-related fires between the two groups. The test revealed a significant difference, suggesting that conflict activity tends to be more intense in areas close to strategic mineral resources.
+
+```{r}
+
+# Create buffer zones around mineral deposits
+mineral_zone <- st_transform(mrds_ukraine, crs = 3857) %>%
+  st_buffer(50000) %>%
+  st_transform(4326)
+
+# Flag war fires that fall within mineral zones
+fires_near_minerals <- sf_fires %>%
+  mutate(near_minerals = as.integer(lengths(st_intersects(geometry, mineral_zone)) > 0))
+
+# T-test: Compare war fire size between near and not-near mineral zones
+fire_test <- t.test(length_of_war_fire_area ~ near_minerals, data = fires_near_minerals)
+print(fire_test)
+```
+
+A two-Sample *t*-test was conducted to compare the average size of war-related fires in areas **near** vs. **not near** strategic mineral deposits. The test result is statistically significant, indicating a clear difference between the two groups.
+
+-   **Mean fire size in non-mineral areas**: 900.19
+
+-   **Mean fire size in mineral-rich areas**: 956.77
+
+This suggests that war-related fires tend to be larger in regions near strategic mineral resources, reinforcing the hypothesis that mineral zones may be of greater military importance and, therefore, more likely to be targeted or contested in the conflict.
+
+### 6.2 Is more military aid sent to regions richer in strategic minerals?
+
+This code analyzes whether regions near strategic mineral deposits receive more military aid. It creates a 50 km buffer around mineral sites, flags districts intersecting these zones, and joins them with fire and aid data. It then compares total aid received in areas near and far from minerals using a t-test to assess if the difference is statistically significant.
+
+```{r}
+# Create unified mineral zone (buffered around deposits)
+mineral_union <- mrds_ukraine %>%
+  st_transform(crs = 3857) %>%
+  st_buffer(50000) %>%
+  st_union() %>%
+  st_make_valid() %>%
+  st_transform(crs = 4326)
+
+# Flag districts that intersect mineral zones
+ukraine_with_minerals <- ukraine_map %>%
+  mutate(near_minerals = as.integer(st_intersects(geometry, mineral_union, sparse = FALSE)))
+
+# Join fire data to tagged districts
+fires_joined <- st_join(fires_by_area, ukraine_with_minerals, join = st_within, left = FALSE)
+
+# Aggregate daily military aid to avoid many-to-many join
+daily_aid <- UST_aid_type_general %>%
+  group_by(announcement_date) %>%
+  summarise(total_value_EUR = sum(total_value_EUR, na.rm = TRUE), .groups = "drop")
+
+# Add aid info to fire data
+fires_joined <- fires_joined %>%
+  left_join(daily_aid, by = c("date" = "announcement_date"))
+
+# Summarize aid by mineral proximity
+mineral_aid <- fires_joined %>%
+  group_by(near_minerals) %>%
+  summarise(
+    total_aid = sum(total_value_EUR, na.rm = TRUE),
+    n_obs = n(),
+    .groups = "drop"
+  )
+
+# Run t-test comparing aid near vs. not near minerals
+aid_test <- t.test(total_value_EUR ~ near_minerals, data = fires_joined)
+
+# Print output
+print(mineral_aid)
+print(aid_test)
+```
+
+The two Sample t-test reveals a statistically significant difference in the average amount of military aid between regions near strategic minerals and those that are not (p-value \< 2.2e-16). Specifically, areas located near mineral zones received, on average, approximately €299.6 million, compared to €241.3 million in other regions—a difference of over €58 million. This suggests that military aid allocations may be spatially correlated with the presence of valuable mineral resources, potentially reflecting strategic considerations in targeting support toward areas with higher economic or military relevance.
+
+The following plots reveal a strong positive relationship between cumulative military aid and the size of war-related fires occurring near strategic mineral deposits. In Russian-controlled areas, the correlation is exceptionally high (r = 0.924), suggesting that as more aid is allocated, the intensity of conflict near mineral zones increases significantly—likely reflecting Ukraine’s offensive actions in these resource-rich areas. In Ukrainian-controlled territories, the correlation remains strong (r = 0.843), though slightly weaker, which may indicate a mix of defensive operations or Russian targeting of these zones. Overall, the findings support the idea that mineral-rich regions are more actively contested and closely linked to the flow of international military support.
+
+```{r, fig.width=12, fig.height=8, dpi=600}
+# Plot: Russian-Controlled (Improved)
+ggplot(plot_russian_minerals, aes(x = cumulative_aid, y = total_fire_area)) +
+  geom_point(alpha = 0.6, color = "blue3") +
+  geom_smooth(method = "lm", se = FALSE, color = "blue3", linetype = "dashed") +
+  annotate("text",
+           x = min(plot_russian_minerals$cumulative_aid, na.rm = TRUE),
+           y = max(plot_russian_minerals$total_fire_area, na.rm = TRUE),
+           label = paste0("r = ", cor_russian_minerals),
+           hjust = 0, size = 5, color = "blue3") +
+  labs(
+    title = "Aid vs. War Fires Near Minerals\n(Russian-Controlled, Monthly)",
+    x = "Cumulative Military Aid (EUR)",
+    y = "Total War Fire Area",
+    caption = "Source: ISW, UST, and MRDS"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+  )
+
+# Plot: Ukrainian-Controlled (Improved)
+ggplot(plot_ukrainian_minerals, aes(x = cumulative_aid, y = total_fire_area)) +
+  geom_point(alpha = 0.6, color = "red3") +
+  geom_smooth(method = "lm", se = FALSE, color = "red3", linetype = "dashed") +
+  annotate("text",
+           x = min(plot_ukrainian_minerals$cumulative_aid, na.rm = TRUE),
+           y = max(plot_ukrainian_minerals$total_fire_area, na.rm = TRUE),
+           label = paste0("r = ", cor_ukrainian_minerals),
+           hjust = 0, size = 5, color = "red3") +
+  labs(
+    title = "Aid vs. War Fires Near Minerals\n(Ukrainian-Controlled, Monthly)",
+    x = "Cumulative Military Aid (EUR)",
+    y = "Total War Fire Area",
+    caption = "Source: ISW, UST, and MRDS"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, face = "bold")
+  )
+```
+
+## 7. Conclusions
+
+## 8. References
+
+Road data : <https://datacatalog.worldbank.org/search/dataset/0061358/Ukraine---Roads>
+
+```         
+U.S. Geological Survey. (n.d.). Mineral Resources Data System (MRDS). Retrieved [Date Retrieved], from https://quizlet.com/720919429/databases-assessment-flash-cards/. 
+```
+
+[**Institute for the Study of War (ISW)**]{.underline}

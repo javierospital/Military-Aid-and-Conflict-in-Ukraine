@@ -38,7 +38,7 @@ We find a statistically significant correlation between cumulative military aid 
   <img src="Key Figures/Ukraine-FIgure-5.png" width="700"/>
 </p>
 
-## Conclusion
+### Conclusion
 
 Cumulative military aid to Ukraine is positively correlated with war-related fire activity, particularly in areas with good road access and around strategic resources. While this supports the idea that aid is partially realized as weapons, the strongest effects appear in Ukrainian-controlled territory—challenging initial expectations. We also find greater conflict intensity near valuable mineral deposits, possibly reflecting the presence of Russian forces. Overall, military aid may be an informative but imperfect—proxy for deployed firepower on the battlefield.
 
